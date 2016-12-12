@@ -87,8 +87,12 @@ class GAEProxyHandler(simple_http_server.HttpServerHandler):
         we forward it to localhost.
         """
         host = self.headers.get('Host', '')
+        host_ip = None
+        port = None
         host_ip, _, port = host.rpartition(':')
         self.parsed_url = urlparse.urlparse(self.path)
+        if not host_ip:
+            host_ip = host
         try:
             port = int(port)
         except:
@@ -114,8 +118,8 @@ class GAEProxyHandler(simple_http_server.HttpServerHandler):
             path = self.parsed_url[2]
         content, status, response = http_client.request(self.command, path, request_headers, payload)
         if not status:
-            xlog.warn("forward_local fail: %d, command: %s, path: %s, headers: %s, payload: %s, response: %s",
-                status, self.command, path, request_headers, payload, response)
+            xlog.warn("forward_local fail: %d, host: %s, command: %s, path: %s, headers: %s, payload: %s, response: %s",
+                status, host, self.command, path, request_headers, payload, response)
             return
 
         out_list = []
