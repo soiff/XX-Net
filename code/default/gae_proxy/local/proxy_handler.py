@@ -87,8 +87,20 @@ class GAEProxyHandler(simple_http_server.HttpServerHandler):
         we forward it to localhost.
         """
         host = self.headers.get('Host', '')
+        host_ip = None
+        port = None
         host_ip, _, port = host.rpartition(':')
-        http_client = simple_http_client.HTTP_client((host_ip, int(port)))
+        self.parsed_url = urlparse.urlparse(self.path)
+        if not host_ip:
+            host_ip = host
+        try:
+            port = int(port)
+        except:
+            if self.parsed_url[0] == 'https':
+                port = 443
+            else:
+                port = 80
+        http_client = simple_http_client.HTTP_client((host_ip, port))
 
         request_headers = dict((k.title(), v) for k, v in self.headers.items())
         payload = b''
@@ -100,14 +112,14 @@ class GAEProxyHandler(simple_http_server.HttpServerHandler):
                 xlog.warn('forward_local read payload failed:%s', e)
                 return
 
-        self.parsed_url = urlparse.urlparse(self.path)
         if len(self.parsed_url[4]):
             path = '?'.join([self.parsed_url[2], self.parsed_url[4]])
         else:
             path = self.parsed_url[2]
         content, status, response = http_client.request(self.command, path, request_headers, payload)
         if not status:
-            xlog.warn("forward_local fail")
+            xlog.warn("forward_local fail: %d, host: %s, command: %s, path: %s, headers: %s, payload: %s, response: %s",
+                status, host, self.command, path, request_headers, payload, response)
             return
 
         out_list = []
@@ -164,7 +176,13 @@ class GAEProxyHandler(simple_http_server.HttpServerHandler):
                     or s in self.local_names:
                 print s
                 return True
-        return False
+            for h in config.ONLYHOSTS:
+                if s.endswith(h):
+                    return False
+        if len(config.ONLYHOSTS) > 0:
+            return True
+        else:
+            return False
 
     def do_METHOD(self):
         touch_active()
